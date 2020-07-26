@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates a lambda function along with an IAM role for the Lambda to monitor the VIF BGP status by creating custom CW metrics.
+Resources:
+  LambdaFunctionIAMRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "lambda.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/CloudWatchFullAccess"
+      - "arn:aws:iam::aws:policy/AWSDirectConnectReadOnlyAccess"
+      Path: "/"
+  
+  LambdaFunction:
+    Type: "AWS::Lambda::Function"  
+    Properties: 
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          def lambda_handler(event, context):
+            client = boto3.client('directconnect')
+            responsedx = client.describe_virtual_interfaces()
+            for v in responsedx['virtualInterfaces']:
+              vifid = (v['virtualInterfaceId'])
+              for bgppeer in v['bgpPeers']:
+                ConnectionState = bgppeer['bgpStatus']
+                if ConnectionState == "up":
+                  statevalue = 1
+                else:
+                  statevalue = 0
+              print ("VIF :",vifid,"state is :",statevalue)
+              client2 = boto3.client('cloudwatch')
+              responsecw = client2.put_metric_data(
+              Namespace="DirectConnectVif",
+              MetricData=[
+                {
+                    'MetricName' : "VirtualInterfaceState",
+                    'Dimensions' : [
+                        {
+                            'Name' : "VirtualInterfaceId",
+                            'Value' : vifid
+                            },
+                        ],
+                      'Value' :  statevalue  
+                            
+                        }]
+                    )
+            return "VirtualInterfaceState successfully published"
+      Description: "Lambda function to check DX vif BGP state and publish custom metric for the state"
+      FunctionName: "DirectConnectVifMonitor"
+      Handler: "index.lambda_handler"
+      Role: !GetAtt LambdaFunctionIAMRole.Arn
+      Runtime: "python3.6"
+      Timeout: 10
+  
+  CloudWatchEventSchedulerRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "Cloudwatch Event Rule to trigger Direct Connect Monitoring Lambda every minute"
+      Name: DXVifMonitorSchedule
+      ScheduleExpression:  "rate(1 minute)"
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt
+            - LambdaFunction
+            - Arn
+          Id: LambdaDXMonitor
+  
+  PermissionsToCWEForLambda:  
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !GetAtt 
+        - LambdaFunction
+        - Arn
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt
+        - CloudWatchEventSchedulerRule
+        - Arn
+
+
+
+
