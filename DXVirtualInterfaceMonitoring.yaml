@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  This template creates a lambda function along with an IAM role for the Lambda to monitor the VIF BGP status by creating custom CW metrics.
+  This template creates a lambda function along with an IAM role for the Lambda to monitor the BGP status of VIFs by creating custom CW metrics.
 Resources:
   LambdaFunctionIAMRole:
     Type: AWS::IAM::Role
