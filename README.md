@@ -2,7 +2,7 @@
 
 The CloudFormation template is configured to launch the following resources in your account for each region where you run it:  
 
-a) A lambda function which runs describe virtual-interfaces api call and picks up the BGP status of each of the VIFs. Based on status value puts 0/1 on a custom metric in the namespace DirectConnectVif with the VIF name as dimension.  
+a) A lambda function which runs describe virtual-interfaces api call and picks up the BGP status of each of the VIFs. Based on status value puts 0/1 on a custom metric in the namespace DirectConnectVif with the VIF name as the dimension.  
 
 b) IAM Role for Lambda function which gives it the permissions to run the API calls mentioned in step-1. 
 
